@@ -10,6 +10,7 @@ module SAP1_tb;
     wire [6:0]  SSEG_CA;
     wire [3:0]  SSEG_AN;
     reg         div_zero_flag_seen;
+    reg         umul_overflow_seen;
 
     // Instantiate SAP1 top module
     SAP1 #(
@@ -32,6 +33,7 @@ module SAP1_tb;
     // Task: reset SAP1
     task reset_sap1;
     begin
+        SW[11] = 1'b0;   // programming mode, keep CPU clock stopped during reset
         BTN[4] = 1'b1;   // Clear / Reset
         #100;
         BTN[4] = 1'b0;
@@ -82,6 +84,7 @@ module SAP1_tb;
         SW  = 16'b0;
         BTN = 5'b0;
         div_zero_flag_seen = 1'b0;
+        umul_overflow_seen = 1'b0;
 
         #100;
 
@@ -90,6 +93,7 @@ module SAP1_tb;
 
         // Test 1: MUL
         div_zero_flag_seen = 1'b0;
+        umul_overflow_seen = 1'b0;
         clear_ram();
         write_ram(4'h0, 8'hB4);   // LDA 4
         write_ram(4'h1, 8'h85);   // MUL 5
@@ -114,8 +118,35 @@ module SAP1_tb;
 
         reset_sap1();
 
+        // Test 1B: Signed MUL
+        div_zero_flag_seen = 1'b0;
+        umul_overflow_seen = 1'b0;
+        clear_ram();
+        write_ram(4'h0, 8'hB4);   // LDA 4
+        write_ram(4'h1, 8'h85);   // MUL 5
+        write_ram(4'h2, 8'h00);   // OUT
+        write_ram(4'h3, 8'h40);   // HLT
+        write_ram(4'h4, 8'hFD);   // Data -3
+        write_ram(4'h5, 8'd4);    // Data 4
+        start_cpu_and_wait();
+
+        $display("--------------------------------");
+        $display("Test 1B: Signed MUL");
+        $display("Output register = %d", $signed(uut.out_reg_output));
+        $display("Output register = %h", uut.out_reg_output);
+        $display("Cout            = %b", uut.cout);
+        $display("--------------------------------");
+
+        if (uut.out_reg_output == 8'hF4)
+            $display("TEST PASSED: -3 * 4 = -12");
+        else
+            $display("TEST FAILED: expected -12 (F4), got %h", uut.out_reg_output);
+
+        reset_sap1();
+
         // Test 2: DIV
         div_zero_flag_seen = 1'b0;
+        umul_overflow_seen = 1'b0;
         clear_ram();
         write_ram(4'h0, 8'hB4);   // LDA 4
         write_ram(4'h1, 8'h95);   // DIV 5
@@ -140,8 +171,35 @@ module SAP1_tb;
 
         reset_sap1();
 
+        // Test 2B: Signed DIV
+        div_zero_flag_seen = 1'b0;
+        umul_overflow_seen = 1'b0;
+        clear_ram();
+        write_ram(4'h0, 8'hB4);   // LDA 4
+        write_ram(4'h1, 8'h95);   // DIV 5
+        write_ram(4'h2, 8'h00);   // OUT
+        write_ram(4'h3, 8'h40);   // HLT
+        write_ram(4'h4, 8'hF4);   // Data -12
+        write_ram(4'h5, 8'd4);    // Data 4
+        start_cpu_and_wait();
+
+        $display("--------------------------------");
+        $display("Test 2B: Signed DIV");
+        $display("Output register = %d", $signed(uut.out_reg_output));
+        $display("Output register = %h", uut.out_reg_output);
+        $display("Cout            = %b", uut.cout);
+        $display("--------------------------------");
+
+        if (uut.out_reg_output == 8'hFD)
+            $display("TEST PASSED: -12 / 4 = -3");
+        else
+            $display("TEST FAILED: expected -3 (FD), got %h", uut.out_reg_output);
+
+        reset_sap1();
+
         // Test 3: DIV by zero
         div_zero_flag_seen = 1'b0;
+        umul_overflow_seen = 1'b0;
         clear_ram();
         write_ram(4'h0, 8'hB4);   // LDA 4
         write_ram(4'h1, 8'h95);   // DIV 5
@@ -171,6 +229,78 @@ module SAP1_tb;
             $display("TEST PASSED: 12 / 0 = FF with div-zero flag");
         else
             $display("TEST FAILED: expected FF and sampled div-zero flag=1, got %h and sampled flag=%b", uut.out_reg_output, div_zero_flag_seen);
+
+        reset_sap1();
+
+        // Test 4: Unsigned MUL
+        div_zero_flag_seen = 1'b0;
+        umul_overflow_seen = 1'b0;
+        clear_ram();
+        write_ram(4'h0, 8'hB4);   // LDA 4
+        write_ram(4'h1, 8'hA5);   // UMUL 5
+        write_ram(4'h2, 8'h00);   // OUT
+        write_ram(4'h3, 8'h40);   // HLT
+        write_ram(4'h4, 8'd200);  // Data 200
+        write_ram(4'h5, 8'd2);    // Data 2
+        SW[11] = 1'b1;            // run = 1
+        SW[10] = 1'b0;
+
+        wait (uut.UMul == 1'b1);
+        #1;
+        $display("DEBUG UMUL: A=%h B=%h W_out_AS=%h Eu=%b La=%b Lb=%b cout=%b",
+                 uut.AS_accumulator, uut.AS_b_register, uut.W_out_AS,
+                 uut.Eu, uut.La, uut.Lb, uut.cout);
+        if (uut.cout == 1'b1)
+            umul_overflow_seen = 1'b1;
+
+        #5000;
+
+        $display("--------------------------------");
+        $display("Test 4: Unsigned MUL");
+        $display("Output register = %d", uut.out_reg_output);
+        $display("Output register = %h", uut.out_reg_output);
+        $display("Cout (sampled at UMUL execute) = %b", umul_overflow_seen);
+        $display("--------------------------------");
+
+        if ((uut.out_reg_output == 8'h90) && (umul_overflow_seen == 1'b1))
+            $display("TEST PASSED: unsigned 200 * 2 = 400, low byte 90 with overflow");
+        else
+            $display("TEST FAILED: expected low byte 90 and sampled overflow=1, got %h and sampled overflow=%b", uut.out_reg_output, umul_overflow_seen);
+
+        reset_sap1();
+
+        // Test 5: Unsigned DIV
+        div_zero_flag_seen = 1'b0;
+        umul_overflow_seen = 1'b0;
+        clear_ram();
+        write_ram(4'h0, 8'hB4);   // LDA 4
+        write_ram(4'h1, 8'hC5);   // UDIV 5
+        write_ram(4'h2, 8'h00);   // OUT
+        write_ram(4'h3, 8'h40);   // HLT
+        write_ram(4'h4, 8'd200);  // Data 200
+        write_ram(4'h5, 8'd2);    // Data 2
+        SW[11] = 1'b1;            // run = 1
+        SW[10] = 1'b0;
+
+        wait (uut.UDiv == 1'b1);
+        #1;
+        $display("DEBUG UDIV: A=%h B=%h W_out_AS=%h Eu=%b La=%b Lb=%b cout=%b",
+                 uut.AS_accumulator, uut.AS_b_register, uut.W_out_AS,
+                 uut.Eu, uut.La, uut.Lb, uut.cout);
+
+        #5000;
+
+        $display("--------------------------------");
+        $display("Test 5: Unsigned DIV");
+        $display("Output register = %d", uut.out_reg_output);
+        $display("Output register = %h", uut.out_reg_output);
+        $display("Cout            = %b", uut.cout);
+        $display("--------------------------------");
+
+        if (uut.out_reg_output == 8'd100)
+            $display("TEST PASSED: unsigned 200 / 2 = 100");
+        else
+            $display("TEST FAILED: expected 100, got %d", uut.out_reg_output);
 
         $stop;
     end

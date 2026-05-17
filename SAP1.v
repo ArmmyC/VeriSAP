@@ -14,7 +14,7 @@ module SAP1 #(
 
   wire [3:0] MAR_output;
 
-  wire Cp, Ep, Lm, CE, Li, Ei, La, Ea, Su, Eu, Lb, Lo, Mul, Div, HALT;
+  wire Cp, Ep, Lm, CE, Li, Ei, La, Ea, Su, Eu, Lb, Lo, Mul, Div, UMul, UDiv, HALT;
   wire [7:4] I;
 
   wire [3:0] RAM_address;
@@ -151,11 +151,13 @@ module SAP1 #(
 
   controller_sequencer CS5 (
                          .CLK(clockline),
+                         .clear(BTN[4]),
                          .I(I),
                          .Cp(Cp), .Ep(Ep), .Lm(Lm), .CE(CE),
                          .Li(Li), .Ei(Ei), .La(La), .Ea(Ea),
                          .Su(Su), .Eu(Eu), .Lb(Lb), .Lo(Lo),
                          .Mul(Mul), .Div(Div),
+                         .UMul(UMul), .UDiv(UDiv),
                          .HALT(HALT)
                        );
 
@@ -175,6 +177,8 @@ module SAP1 #(
                      .Su(Su),
                      .Mul(Mul),
                      .Div(Div),
+                     .UMul(UMul),
+                     .UDiv(UDiv),
                      .Eu(Eu),
                      .Result(W_out_AS),
                      .Cout(cout)
