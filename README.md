@@ -158,6 +158,3 @@ To enter it through the top-level interface, keep `SW[11]` low, select each RAM 
 | [`seven_segment_display.v`](./seven_segment_display.v) | Multiplexed hexadecimal display driver |
 | `*_tb.v` | Simulation testbenches |
 
-## Naming recommendation
-
-The current name, `SAP-1-w-Verilog`, is descriptive but a little awkward. **VeriSAP** is shorter, keeps the SAP-1 reference, and signals that this is the Verilog implementation.
